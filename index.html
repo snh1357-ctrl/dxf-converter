@@ -1,0 +1,248 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>로또 번호 추첨기</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      min-height: 100vh;
+      background: linear-gradient(135deg, #1a1a2e 0%, #16213e 50%, #0f3460 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Segoe UI', sans-serif;
+      color: #fff;
+    }
+
+    .container {
+      text-align: center;
+      padding: 40px 20px;
+      max-width: 620px;
+      width: 100%;
+    }
+
+    h1 {
+      font-size: 2.4rem;
+      font-weight: 800;
+      margin-bottom: 8px;
+      background: linear-gradient(90deg, #f7d000, #ff6b6b);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+    }
+
+    .subtitle {
+      color: #aaa;
+      font-size: 0.95rem;
+      margin-bottom: 48px;
+    }
+
+    .balls-wrap {
+      display: flex;
+      justify-content: center;
+      gap: 14px;
+      flex-wrap: wrap;
+      margin-bottom: 48px;
+      min-height: 90px;
+      align-items: center;
+    }
+
+    .ball {
+      width: 72px;
+      height: 72px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 1.5rem;
+      font-weight: 800;
+      color: #fff;
+      box-shadow: 0 6px 20px rgba(0,0,0,0.4), inset 0 -4px 8px rgba(0,0,0,0.2);
+      opacity: 0;
+      transform: scale(0) rotate(-180deg);
+      transition: all 0.5s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+    }
+
+    .ball.show {
+      opacity: 1;
+      transform: scale(1) rotate(0deg);
+    }
+
+    .n1 { background: linear-gradient(135deg, #f7d000, #f09000); }
+    .n2 { background: linear-gradient(135deg, #4fc3f7, #0288d1); }
+    .n3 { background: linear-gradient(135deg, #ef5350, #c62828); }
+    .n4 { background: linear-gradient(135deg, #9e9e9e, #424242); }
+    .n5 { background: linear-gradient(135deg, #66bb6a, #2e7d32); }
+
+    .placeholder { color: #444; font-size: 1rem; }
+
+    .btn {
+      background: linear-gradient(135deg, #f7d000, #ff6b35);
+      border: none;
+      padding: 16px 48px;
+      font-size: 1.2rem;
+      font-weight: 700;
+      color: #1a1a2e;
+      border-radius: 50px;
+      cursor: pointer;
+      box-shadow: 0 8px 24px rgba(247, 208, 0, 0.3);
+      transition: transform 0.15s, box-shadow 0.15s;
+    }
+
+    .btn:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 32px rgba(247, 208, 0, 0.45);
+    }
+
+    .btn:active { transform: translateY(0); }
+
+    .btn:disabled {
+      opacity: 0.6;
+      cursor: not-allowed;
+      transform: none;
+    }
+
+    .history {
+      margin-top: 48px;
+      text-align: left;
+    }
+
+    .history h2 {
+      font-size: 0.9rem;
+      color: #888;
+      margin-bottom: 14px;
+      text-transform: uppercase;
+      letter-spacing: 1px;
+    }
+
+    .history-list {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      max-height: 240px;
+      overflow-y: auto;
+    }
+
+    .history-item {
+      background: rgba(255,255,255,0.05);
+      border: 1px solid rgba(255,255,255,0.08);
+      border-radius: 12px;
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .history-num {
+      font-size: 0.75rem;
+      color: #555;
+      width: 20px;
+      flex-shrink: 0;
+    }
+
+    .mini-ball {
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #fff;
+      flex-shrink: 0;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <h1>🎱 로또 번호 추첨기</h1>
+    <p class="subtitle">1~45 사이에서 6개의 행운의 번호를 뽑아드립니다</p>
+
+    <div class="balls-wrap" id="balls">
+      <p class="placeholder">버튼을 눌러 번호를 추첨하세요</p>
+    </div>
+
+    <button class="btn" id="drawBtn" onclick="draw()">번호 추첨하기</button>
+
+    <div class="history" id="historySection" style="display:none">
+      <h2>추첨 기록</h2>
+      <div class="history-list" id="historyList"></div>
+    </div>
+  </div>
+
+  <script>
+    const history = [];
+    let drawing = false;
+
+    function getBallColor(n) {
+      if (n <= 10) return 'n1';
+      if (n <= 20) return 'n2';
+      if (n <= 30) return 'n3';
+      if (n <= 40) return 'n4';
+      return 'n5';
+    }
+
+    function draw() {
+      if (drawing) return;
+      drawing = true;
+      document.getElementById('drawBtn').disabled = true;
+
+      const nums = [];
+      while (nums.length < 6) {
+        const n = Math.floor(Math.random() * 45) + 1;
+        if (!nums.includes(n)) nums.push(n);
+      }
+      nums.sort((a, b) => a - b);
+
+      const wrap = document.getElementById('balls');
+      wrap.innerHTML = '';
+
+      nums.forEach((n, i) => {
+        const ball = document.createElement('div');
+        ball.className = `ball ${getBallColor(n)}`;
+        ball.textContent = n;
+        wrap.appendChild(ball);
+
+        setTimeout(() => {
+          ball.classList.add('show');
+          if (i === 5) {
+            setTimeout(() => {
+              drawing = false;
+              document.getElementById('drawBtn').disabled = false;
+              addHistory(nums);
+            }, 400);
+          }
+        }, i * 200);
+      });
+    }
+
+    function addHistory(nums) {
+      history.unshift(nums);
+      if (history.length > 10) history.pop();
+
+      const section = document.getElementById('historySection');
+      const list = document.getElementById('historyList');
+      section.style.display = 'block';
+      list.innerHTML = '';
+
+      history.forEach((entry, idx) => {
+        const item = document.createElement('div');
+        item.className = 'history-item';
+        item.innerHTML = `<span class="history-num">${idx + 1}</span>`;
+        entry.forEach(n => {
+          const b = document.createElement('div');
+          b.className = `mini-ball ${getBallColor(n)}`;
+          b.textContent = n;
+          item.appendChild(b);
+        });
+        list.appendChild(item);
+      });
+    }
+  </script>
+</body>
+</html>
