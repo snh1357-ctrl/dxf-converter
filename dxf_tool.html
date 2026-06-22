@@ -1,0 +1,910 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>DXF 도구</title>
+<style>
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-height:100vh}
+/* ─── 탭 ─── */
+.tabs{display:flex;background:#fff;border-bottom:1px solid #D1D1D6;position:sticky;top:0;z-index:10}
+.tab{flex:1;padding:14px;text-align:center;font-size:.95rem;font-weight:600;cursor:pointer;color:#8E8E93;border-bottom:3px solid transparent;transition:.2s}
+.tab.active{color:#007AFF;border-bottom-color:#007AFF}
+.page{display:none;padding:24px 20px;max-width:900px;margin:0 auto}
+.page.active{display:block}
+/* ─── 카드 ─── */
+.card{background:#fff;border-radius:14px;box-shadow:0 2px 12px rgba(0,0,0,.07);margin-bottom:16px;overflow:hidden}
+.card-header{background:#F9F9FB;padding:12px 18px;border-bottom:1px solid #D1D1D6;font-weight:700;font-size:.9rem;display:flex;align-items:center;gap:8px}
+.card-body{padding:18px}
+/* ─── 드롭존 ─── */
+.drop-zone{border:2px dashed #C4C9D4;border-radius:10px;padding:36px 20px;text-align:center;cursor:pointer;transition:.2s;color:#8E8E93;font-size:.875rem}
+.drop-zone:hover,.drop-zone.hover{border-color:#007AFF;background:#F0F4FF;color:#007AFF}
+.drop-zone input{display:none}
+/* ─── 버튼 ─── */
+.btn{padding:11px 24px;border:none;border-radius:10px;font-size:.95rem;font-weight:600;cursor:pointer;transition:.15s;display:inline-flex;align-items:center;gap:6px}
+.btn:disabled{opacity:.45;cursor:default}
+.btn-blue{background:#007AFF;color:#fff}
+.btn-blue:not(:disabled):hover{background:#0062CC}
+.btn-green{background:#34C759;color:#fff}
+.btn-green:not(:disabled):hover{background:#28A745}
+.btn-gray{background:#E5E5EA;color:#3C3C43}
+.btn-gray:not(:disabled):hover{background:#D1D1D6}
+.btn-sm{padding:6px 14px;font-size:.82rem;border-radius:7px}
+/* ─── 상태 ─── */
+.status{font-size:.85rem;font-weight:500;min-height:1.4em;margin-top:6px}
+.status.ok{color:#34C759}.status.err{color:#FF3B30}.status.info{color:#007AFF}.status.warn{color:#FF9500}
+/* ─── 로그 ─── */
+.log{background:#1A1A2E;color:#E2E8F0;border-radius:10px;padding:14px;font-family:'Consolas',monospace;font-size:.8rem;max-height:200px;overflow-y:auto;white-space:pre-wrap;line-height:1.6}
+.log .ok{color:#34C759}.log .err{color:#FF3B30}.log .warn{color:#FF9500}.log .info{color:#7C6AF7}
+/* ─── 뷰어 ─── */
+#viewer-wrap{display:flex;gap:0;height:calc(100vh - 160px);min-height:400px}
+#dxf-canvas{flex:1;background:#FAFAFA;display:block;cursor:crosshair;border-radius:0 0 14px 0;border-top:1px solid #E0E0E0}
+#layer-panel{width:190px;background:#F5F5F7;overflow-y:auto;border-radius:0 0 0 14px;padding:8px;border-top:1px solid #E0E0E0;border-right:1px solid #E0E0E0}
+#layer-panel.hidden{display:none}
+.layer-item{display:flex;align-items:center;gap:6px;padding:4px 2px;font-size:.78rem;color:#3C3C43;cursor:pointer}
+.layer-item input{accent-color:#007AFF}
+/* ─── 뷰어 툴바 ─── */
+.viewer-toolbar{display:flex;align-items:center;gap:4px;background:#fff;padding:6px 10px;border-radius:14px 14px 0 0;border:1px solid #E0E0E0;border-bottom:none;flex-wrap:wrap}
+.tbtn{padding:7px 13px;background:transparent;color:#3C3C43;border:none;border-radius:7px;font-size:.82rem;cursor:pointer;transition:.15s}
+.tbtn:hover{background:#F0F0F5}
+.tbtn.active{background:#007AFF;color:#fff}
+.vdivider{width:1px;height:20px;background:#D1D1D6;margin:0 4px}
+#coord-bar{font-size:.75rem;color:#8E8E93;padding:4px 14px;background:#F2F2F7;border-radius:0 0 14px 14px;border:1px solid #E0E0E0;border-top:none;font-family:Consolas,monospace;display:flex;gap:20px}
+/* ─── 파일명 표시 ─── */
+.fname{font-size:.8rem;color:#555;margin-top:6px;min-height:1em}
+/* ─── 뱃지 ─── */
+.badge{display:inline-block;padding:2px 8px;border-radius:20px;font-size:.72rem;font-weight:700;color:#fff}
+.badge-blue{background:#007AFF}.badge-purple{background:#AF52DE}.badge-teal{background:#32ADE6}
+/* ─── 옵션 행 ─── */
+.opt-row{display:flex;align-items:center;gap:10px;flex-wrap:wrap;font-size:.85rem;color:#8E8E93}
+.opt-row label{display:flex;align-items:center;gap:6px;white-space:nowrap}
+.opt-row input[type=number]{width:70px;padding:4px 8px;border:1px solid #D1D1D6;border-radius:7px;font-size:.85rem;background:#F2F2F7}
+.sep{width:1px;height:18px;background:#D1D1D6}
+</style>
+</head>
+<body>
+
+<div class="tabs">
+  <div class="tab active" onclick="showTab('conv')">🔄 DXF 변환기</div>
+  <div class="tab" onclick="showTab('view')">👁️ DXF 뷰어</div>
+</div>
+
+<!-- ══════════════ 변환기 탭 ══════════════ -->
+<div class="page active" id="tab-conv">
+  <div class="card">
+    <div class="card-header">
+      <span>DXF 변환기</span>
+      <span class="badge badge-blue">DSN</span>
+      <span class="badge badge-purple">PDS</span>
+    </div>
+    <div class="card-body">
+      <p style="font-size:.875rem;color:#666;margin-bottom:14px">DSN 또는 PDS 패턴 파일을 업로드하면 DXF로 변환 후 다운로드됩니다.</p>
+
+      <div class="drop-zone" id="conv-drop" onclick="document.getElementById('conv-input').click()">
+        <input type="file" id="conv-input" accept=".dsn,.pds,.DSN,.PDS" multiple>
+        <div style="font-size:2rem;margin-bottom:8px">📁</div>
+        클릭하거나 파일을 드래그하세요<br>
+        <small style="color:#aaa">(.dsn, .pds — 여러 파일 동시 선택 가능)</small>
+      </div>
+      <div class="fname" id="conv-fname"></div>
+
+      <div class="opt-row" style="margin-top:14px">
+        <label>좌표 배율 <input type="number" id="opt-scale" value="1.0" step="0.1" min="0.01"></label>
+        <span class="sep"></span>
+        <label>곡선 분할 <input type="number" id="opt-bez" value="32" step="8" min="8" max="128"></label>
+        <span class="sep"></span>
+        <span style="font-size:.78rem;color:#aaa">mm→cm: 배율 0.1</span>
+      </div>
+
+      <div style="margin-top:16px;display:flex;gap:10px;flex-wrap:wrap">
+        <button class="btn btn-blue" id="conv-btn" disabled onclick="runConvert()">변환하기</button>
+        <button class="btn btn-gray btn-sm" onclick="clearConv()">초기화</button>
+      </div>
+      <div class="status" id="conv-status"></div>
+    </div>
+  </div>
+
+  <div class="card">
+    <div class="card-header">변환 로그</div>
+    <div class="card-body" style="padding:0">
+      <div class="log" id="conv-log"></div>
+    </div>
+  </div>
+</div>
+
+<!-- ══════════════ 뷰어 탭 ══════════════ -->
+<div class="page" id="tab-view">
+  <div class="card" style="margin-bottom:0">
+    <div class="viewer-toolbar">
+      <button class="tbtn" onclick="viewerOpen()">📂 열기</button>
+      <input type="file" id="view-input" accept=".dxf" style="display:none" onchange="loadDXFFile(this.files[0])">
+      <div class="vdivider"></div>
+      <button class="tbtn" onclick="fitView()" title="F">⛶ 전체보기</button>
+      <button class="tbtn" onclick="zoomCenter(1.25)" title="+">＋</button>
+      <button class="tbtn" onclick="zoomCenter(0.8)" title="-">－</button>
+      <div class="vdivider"></div>
+      <button class="tbtn" id="layer-toggle-btn" onclick="toggleLayerPanel()">☰ 레이어</button>
+      <div class="vdivider"></div>
+      <span id="view-title" style="font-size:.8rem;color:#94A3B8;margin-left:6px">DXF 파일을 열어주세요</span>
+    </div>
+    <div id="viewer-wrap">
+      <canvas id="dxf-canvas"></canvas>
+      <div id="layer-panel" class="hidden"></div>
+    </div>
+    <div id="coord-bar">
+      <span id="coord-xy">X: —  Y: —</span>
+      <span id="coord-zoom">배율: —</span>
+      <span id="coord-info"></span>
+    </div>
+  </div>
+</div>
+
+<script>
+// ══════════════════════════════════════════════════════════════
+//  탭 전환
+// ══════════════════════════════════════════════════════════════
+function showTab(name) {
+  document.querySelectorAll('.tab').forEach((t,i)=>t.classList.toggle('active',['conv','view'][i]===name));
+  document.querySelectorAll('.page').forEach(p=>p.classList.remove('active'));
+  document.getElementById('tab-'+name).classList.add('active');
+  if(name==='view') setTimeout(fitView,50);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  공통 유틸
+// ══════════════════════════════════════════════════════════════
+function nums(s){ return [...s.matchAll(/-?[\d]+(?:\.[\d]+)?(?:[eE][+-]?\d+)?/g)].map(m=>parseFloat(m[0])); }
+
+async function readTextMultiEnc(file){
+  const buf = await file.arrayBuffer();
+  for(const enc of ['utf-8','cp949','euc-kr','utf-16','iso-8859-1']){
+    try{ return new TextDecoder(enc,{fatal:true}).decode(buf); }catch(e){}
+  }
+  return new TextDecoder('iso-8859-1').decode(buf);
+}
+
+function downloadText(text, filename){
+  const blob = new Blob([text],{type:'application/dxf'});
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(blob);
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(a.href);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  데이터 구조
+// ══════════════════════════════════════════════════════════════
+class Segment{ constructor(kind,points){this.kind=kind;this.points=points;} }
+class Notch{ constructor(x,y,angle=0,length=10){this.x=x;this.y=y;this.angle=angle;this.length=length;} }
+class PatternPiece{
+  constructor(name=''){
+    this.name=name; this.start=null; this.segments=[]; this.internalLines=[]; this.notches=[];
+    this.grainline=null; this.label=''; this.unitScale=1.0;
+  }
+  boundaryPoints(n=20){
+    if(!this.start) return [];
+    const pts=[this.start];
+    for(const s of this.segments){
+      if(s.kind==='line'){ pts.push(s.points[0]); }
+      else if(s.kind==='bezier'){
+        const p0=pts[pts.length-1]; const [cp1,cp2,end]=s.points;
+        for(let i=1;i<=n;i++){
+          const t=i/n, u=1-t;
+          pts.push([
+            u**3*p0[0]+3*u**2*t*cp1[0]+3*u*t**2*cp2[0]+t**3*end[0],
+            u**3*p0[1]+3*u**2*t*cp1[1]+3*u*t**2*cp2[1]+t**3*end[1],
+          ]);
+        }
+      }
+    }
+    return pts;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DSN 파서 (AAMA / Section / YukaCAD / 좌표테이블)
+// ══════════════════════════════════════════════════════════════
+function parseDSN_AAMA(text){
+  const pieces=[]; let cur=null; let mode=null;
+  for(let raw of text.split(/\r?\n/)){
+    const line=raw.trim();
+    if(!line || /^[\/\/#;]/.test(line)) continue;
+    let m;
+    m=line.match(/^PieceStart\s+"?([^"]*)"?/i);
+    if(m){ if(cur) pieces.push(cur); cur=new PatternPiece(m[1].trim()); mode='b'; continue; }
+    if(/^PieceEnd/i.test(line)){ if(cur) pieces.push(cur); cur=null; mode=null; continue; }
+    if(!cur) continue;
+    m=line.match(/^Units?\s+(\S+)/i);
+    if(m){ cur.unitScale={'mm':1,'cm':10,'inch':25.4,'in':25.4}[m[1].toLowerCase()]||1; continue; }
+    m=line.match(/^V\s+(.+)/i);
+    if(m){ const ns=nums(m[1]); if(ns.length>=2){ const pt=[ns[0],ns[1]]; cur.start?cur.segments.push(new Segment('line',[pt])):cur.start=pt; } continue; }
+    m=line.match(/^BL\s+(.+)/i);
+    if(m){ const ns=nums(m[1]); if(ns.length>=2){ const pt=[ns[0],ns[1]]; cur.start?cur.segments.push(new Segment('line',[pt])):cur.start=pt; } continue; }
+    m=line.match(/^BC\s+(.+)/i);
+    if(m){ const ns=nums(m[1]);
+      if(ns.length>=8){ if(!cur.start) cur.start=[ns[0],ns[1]]; cur.segments.push(new Segment('bezier',[[ns[2],ns[3]],[ns[4],ns[5]],[ns[6],ns[7]]])); }
+      else if(ns.length>=6){ cur.segments.push(new Segment('bezier',[[ns[0],ns[1]],[ns[2],ns[3]],[ns[4],ns[5]]])); }
+      continue; }
+    m=line.match(/^NC\s+(.+)/i);
+    if(m){ const ns=nums(m[1]); if(ns.length>=2) cur.notches.push(new Notch(ns[0],ns[1],ns[2]||0)); continue; }
+    m=line.match(/^GR(?:AIN)?\s+(.+)/i);
+    if(m){ const ns=nums(m[1]); if(ns.length>=4) cur.grainline=[[ns[0],ns[1]],[ns[2],ns[3]]]; continue; }
+  }
+  if(cur) pieces.push(cur);
+  return pieces;
+}
+
+function parseDSN_Section(text){
+  const pieces=[]; let cur=null; let mode=null;
+  for(let raw of text.split(/\r?\n/)){
+    const line=raw.trim();
+    if(!line || /^[#;]/.test(line)) continue;
+    let m;
+    m=line.match(/^\[PIECE\s*(.*?)\]/i);
+    if(m){ if(cur) pieces.push(cur); cur=new PatternPiece(m[1].trim()); mode=null; continue; }
+    if(!cur) continue;
+    if(/^BOUNDARY/i.test(line)){ mode='b'; continue; }
+    if(/^INTERNAL/i.test(line)){ mode='i'; cur.internalLines.push([]); continue; }
+    if(/^NOTCH/i.test(line)){ const ns=nums(line.slice(5)); if(ns.length>=2) cur.notches.push(new Notch(ns[0],ns[1],ns[2]||0)); continue; }
+    if(/^GRAIN/i.test(line)){ const ns=nums(line.slice(5)); if(ns.length>=4) cur.grainline=[[ns[0],ns[1]],[ns[2],ns[3]]]; continue; }
+    if(/^LABEL\s+/i.test(line)){ cur.label=line.slice(5).trim(); continue; }
+    m=line.match(/^B\s+(.+)/i);
+    if(m&&mode==='b'){ const ns=nums(m[1]); if(ns.length>=6) cur.segments.push(new Segment('bezier',[[ns[0],ns[1]],[ns[2],ns[3]],[ns[4],ns[5]]])); continue; }
+    const ns=nums(line);
+    if(ns.length>=2&&mode){
+      const pt=[ns[0],ns[1]];
+      if(mode==='b'){ cur.start?cur.segments.push(new Segment('line',[pt])):cur.start=pt; }
+      else if(mode==='i'&&cur.internalLines.length) cur.internalLines[cur.internalLines.length-1].push(pt);
+    }
+  }
+  if(cur) pieces.push(cur);
+  return pieces;
+}
+
+function parseDSN_Yuka(text){
+  const pieces=[]; let cur=null;
+  for(let raw of text.split(/\r?\n/)){
+    const line=raw.trim(); let m;
+    m=line.match(/^PATTERN\s+"?([^"]+)"?/i);
+    if(m){ if(cur) pieces.push(cur); cur=new PatternPiece(m[1].trim()); continue; }
+    if(/^END/i.test(line)){ if(cur) pieces.push(cur); cur=null; continue; }
+    m=line.match(/^PT\s+(-?[\d.]+)\s+(-?[\d.]+)/i);
+    if(m&&cur){ const x=parseFloat(m[1]),y=parseFloat(m[2]); cur.start?cur.segments.push(new Segment('line',[[x,y]])):cur.start=[x,y]; continue; }
+    m=line.match(/^CP\s+(.+)/i);
+    if(m&&cur){ const ns=nums(m[1]); if(ns.length>=6) cur.segments.push(new Segment('bezier',[[ns[0],ns[1]],[ns[2],ns[3]],[ns[4],ns[5]]])); continue; }
+  }
+  if(cur) pieces.push(cur);
+  return pieces;
+}
+
+function parseDSN_CoordTable(text){
+  const pieces=[]; let cur=null;
+  for(let raw of text.split(/\r?\n/)){
+    const line=raw.trim();
+    if(!line){ if(cur&&cur.segments.length){ pieces.push(cur); cur=null; } continue; }
+    if(line.startsWith('#')){ if(cur&&cur.segments.length) pieces.push(cur); cur=new PatternPiece(line.slice(1).trim()); continue; }
+    const ns=nums(line);
+    if(ns.length>=2){
+      if(!cur) cur=new PatternPiece(`Piece_${pieces.length+1}`);
+      cur.start?cur.segments.push(new Segment('line',[[ns[0],ns[1]]])):cur.start=[ns[0],ns[1]];
+    }
+  }
+  if(cur&&cur.segments.length) pieces.push(cur);
+  return pieces;
+}
+
+function parseDSN(text){
+  const fns=[
+    [parseDSN_AAMA,    'AAMA/Gerber 텍스트'],
+    [parseDSN_Section, '섹션([PIECE])'],
+    [parseDSN_Yuka,    'YukaCAD'],
+    [parseDSN_CoordTable,'좌표 테이블'],
+  ];
+  for(const [fn,name] of fns){
+    try{
+      const pieces=fn(text);
+      if(pieces.length>0&&pieces.some(p=>p.segments.length>0||p.start)) return {pieces,fmt:name};
+    }catch(e){}
+  }
+  return {pieces:[],fmt:'인식 불가'};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  PDS 파서 (Optitex SVG/XML 내장)
+// ══════════════════════════════════════════════════════════════
+const SVG_TO_MM=0.1;
+const INCH_TO_MM=25.4;
+
+function svgPolyPts(s){ const ns=nums(s); const out=[]; for(let i=0;i<ns.length-1;i+=2) out.push([ns[i],ns[i+1]]); return out; }
+function s2mm(pts){ return pts.map(([x,y])=>[x*SVG_TO_MM,-y*SVG_TO_MM]); }
+
+class PDSParser{
+  constructor(){ this.pieceMeta=[]; this.cutPolys=[]; this.sewPaths=[]; this.notches=[]; this.unit='inch'; }
+  load(text){
+    const xs=text.indexOf('<?xml');
+    if(xs<0) throw new Error('XML을 찾을 수 없습니다');
+    const xml=text.slice(xs);
+    this._parseMeta(xml); this._parseSVG(xml);
+  }
+  _parseMeta(x){
+    const mu=x.match(/LINEAR="([^"]+)"/); if(mu) this.unit=mu[1].toLowerCase();
+    this.pieceMeta=[];
+    for(const m of x.matchAll(/<PIECE>([\s\S]*?)<\/PIECE>/g)){
+      const b=m[1];
+      const nm=b.match(/<NAME>(.*?)<\/NAME>/); const qt=b.match(/<QUANTITY>(.*?)<\/QUANTITY>/);
+      const g=b.match(/<SIZE>[\s\S]*?<NAME>S<\/NAME>[\s\S]*?<GEOM_INFO SIZE_X="([^"]+)" SIZE_Y="([^"]+)"/);
+      this.pieceMeta.push({name:nm?nm[1].trim():'?',qty:qt?qt[1].trim():'1',sizeX:g?parseFloat(g[1]):null,sizeY:g?parseFloat(g[2]):null});
+    }
+  }
+  _parseSVG(x){
+    const ss=x.indexOf('<svg '); const se=x.indexOf('</svg>')+6;
+    if(ss<0) throw new Error('SVG 없음');
+    const svg=x.slice(ss,se);
+    const polys=[];
+    for(const m of svg.matchAll(/<polygon[^>]+points="([^"]+)"/g)){
+      const p=svgPolyPts(m[1]); if(p.length>3) polys.push(p);
+    }
+    this.cutPolys=polys.map(s2mm);
+    this.sewPaths=[]; this.notches=[];
+    for(const m of svg.matchAll(/<g style="fill:([^;]+);[^>]*>[\s\S]*?<path d="([^"]+)"/g)){
+      const fc=m[1].trim(); const subs=this._svgPath(m[2]);
+      for(const sub of subs){
+        if(fc==='#0000FF'&&sub.length===2){ this.notches.push([s2mm([sub[0]])[0],s2mm([sub[1]])[0]]); }
+        else if(sub.length>4){ this.sewPaths.push(s2mm(sub)); }
+      }
+    }
+  }
+  _svgPath(d){
+    const subs=[]; let cur=[];
+    const tokens=[...d.matchAll(/[MmLlZzHhVvCcSsQqTtAa]|-?[\d]+(?:\.[\d]+)?/g)].map(m=>m[0]);
+    let i=0,cmd='M';
+    while(i<tokens.length){
+      const t=tokens[i];
+      if(/^[A-Za-z]$/.test(t)){
+        cmd=t; if('Zz'.includes(cmd)&&cur.length){subs.push(cur);cur=[];} i++; continue;
+      }
+      if('ML'.includes(cmd)&&i+1<tokens.length){ cur.push([parseFloat(tokens[i]),parseFloat(tokens[i+1])]); i+=2; }
+      else if('ml'.includes(cmd)&&i+1<tokens.length){
+        const ox=cur.length?cur[cur.length-1][0]:0, oy=cur.length?cur[cur.length-1][1]:0;
+        cur.push([ox+parseFloat(tokens[i]),oy+parseFloat(tokens[i+1])]); i+=2;
+      } else i++;
+    }
+    if(cur.length) subs.push(cur);
+    return subs;
+  }
+  matchNames(){
+    if(!this.pieceMeta.length) return this.cutPolys.map((_,i)=>`Piece_${i+1}`);
+    const bb=pts=>{ const xs=pts.map(p=>p[0]),ys=pts.map(p=>p[1]); return [Math.max(...xs)-Math.min(...xs),Math.max(...ys)-Math.min(...ys)]; };
+    const used={}; const names=[];
+    for(const poly of this.cutPolys){
+      const [pw,ph]=bb(poly); let bestNm=`Piece_${names.length+1}`,bestS=1e9,bestJ=-1;
+      this.pieceMeta.forEach((meta,j)=>{
+        if(meta.sizeX==null) return;
+        const mx=meta.sizeX*INCH_TO_MM, my=meta.sizeY*INCH_TO_MM;
+        const s=Math.min(Math.abs(pw-mx)+Math.abs(ph-my),Math.abs(pw-my)+Math.abs(ph-mx));
+        if(s<bestS&&s<100){ bestS=s; bestNm=meta.name; bestJ=j; }
+      });
+      if(bestJ>=0){ const cnt=(used[bestJ]||0)+1; used[bestJ]=cnt; if(cnt>1) bestNm+=` (${cnt})`; }
+      names.push(bestNm);
+    }
+    return names;
+  }
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DXF 생성기
+// ══════════════════════════════════════════════════════════════
+function dxfHeader(version='AC1015'){ return `  0\nSECTION\n  2\nHEADER\n  9\n$ACADVER\n  1\n${version}\n  0\nENDSEC\n`; }
+
+function dxfTables(layers){
+  let s=`  0\nSECTION\n  2\nTABLES\n  0\nTABLE\n  2\nLAYER\n 70\n${layers.length}\n`;
+  for(const [name,color] of layers)
+    s+=`  0\nLAYER\n  2\n${name}\n 70\n     0\n 62\n${color}\n  6\nCONTINUOUS\n`;
+  return s+`  0\nENDTAB\n  0\nENDSEC\n`;
+}
+
+function dxfLWPoly(layer,points,closed){
+  let s=`  0\nLWPOLYLINE\n  8\n${layer}\n 90\n${points.length}\n 70\n${closed?1:0}\n`;
+  for(const [x,y] of points) s+=` 10\n${x.toFixed(4)}\n 20\n${y.toFixed(4)}\n`;
+  return s;
+}
+
+function dxfLineEnt(layer,x1,y1,x2,y2){
+  return `  0\nLINE\n  8\n${layer}\n 10\n${x1.toFixed(4)}\n 20\n${y1.toFixed(4)}\n 30\n0.0\n 11\n${x2.toFixed(4)}\n 21\n${y2.toFixed(4)}\n 31\n0.0\n`;
+}
+
+function dxfTextEnt(layer,x,y,text,height){
+  return `  0\nTEXT\n  8\n${layer}\n 10\n${x.toFixed(4)}\n 20\n${y.toFixed(4)}\n 30\n0.0\n 40\n${height.toFixed(4)}\n  1\n${text}\n`;
+}
+
+function makeDXF(layerDefs, entities){
+  return dxfHeader() + dxfTables(layerDefs) +
+    `  0\nSECTION\n  2\nENTITIES\n` + entities + `  0\nENDSEC\n  0\nEOF\n`;
+}
+
+// DSN → DXF
+function writeDSNDXF(pieces, scale=1.0, nBez=32){
+  const layerDefs=[['BOUNDARY',7],['INTERNAL',4],['NOTCH',1],['GRAINLINE',3],['LABEL',2]];
+  let ents=''; let ox=0; const GAP=50*scale;
+  for(const piece of pieces){
+    const bnd=piece.boundaryPoints(nBez); if(!bnd.length) continue;
+    const us=piece.unitScale*scale;
+    const pts=bnd.map(([x,y])=>[x*us+ox, y*us]);
+    ents+=dxfLWPoly('BOUNDARY',pts,true);
+    for(const il of piece.internalLines){
+      if(il.length>=2) ents+=dxfLWPoly('INTERNAL',il.map(([x,y])=>[x*us+ox,y*us]),false);
+    }
+    for(const n of piece.notches){
+      const nx=n.x*us+ox, ny=n.y*us, r=n.angle*Math.PI/180, h=n.length*us/2;
+      const dx=Math.cos(r)*h, dy=Math.sin(r)*h;
+      ents+=dxfLineEnt('NOTCH',nx-dx,ny-dy,nx+dx,ny+dy);
+    }
+    if(piece.grainline){
+      const [[gx1,gy1],[gx2,gy2]]=piece.grainline;
+      ents+=dxfLineEnt('GRAINLINE',gx1*us+ox,gy1*us,gx2*us+ox,gy2*us);
+    }
+    const t=piece.label||piece.name;
+    if(t&&pts.length){
+      const cx=pts.reduce((a,p)=>a+p[0],0)/pts.length;
+      const cy=pts.reduce((a,p)=>a+p[1],0)/pts.length;
+      ents+=dxfTextEnt('LABEL',cx,cy,t,5*scale);
+    }
+    const xs=pts.map(p=>p[0]);
+    ox+=(Math.max(...xs)-Math.min(...xs))+GAP;
+  }
+  return makeDXF(layerDefs, ents);
+}
+
+// PDS → DXF
+function writePDSDXF(parser){
+  const layerDefs=[['CUTTING_LINE',2],['SEWING_LINE',7],['NOTCH',1],['LABEL',4]];
+  let ents='';
+  const names=parser.matchNames();
+  for(let i=0;i<parser.cutPolys.length;i++){
+    const poly=parser.cutPolys[i]; if(poly.length<3) continue;
+    ents+=dxfLWPoly('CUTTING_LINE',poly,true);
+    const cx=poly.reduce((a,p)=>a+p[0],0)/poly.length;
+    const cy=poly.reduce((a,p)=>a+p[1],0)/poly.length;
+    ents+=dxfTextEnt('LABEL',cx,cy,names[i]||`Piece_${i+1}`,4.0);
+  }
+  for(const path of parser.sewPaths){
+    if(path.length>=2) ents+=dxfLWPoly('SEWING_LINE',path,false);
+  }
+  for(const [p1,p2] of parser.notches){
+    ents+=dxfLineEnt('NOTCH',p1[0],p1[1],p2[0],p2[1]);
+  }
+  return makeDXF(layerDefs, ents);
+}
+
+// ══════════════════════════════════════════════════════════════
+//  변환기 UI
+// ══════════════════════════════════════════════════════════════
+let convFiles=[];
+const convDrop=document.getElementById('conv-drop');
+const convInput=document.getElementById('conv-input');
+const convBtn=document.getElementById('conv-btn');
+const convFname=document.getElementById('conv-fname');
+const convStatus=document.getElementById('conv-status');
+const convLog=document.getElementById('conv-log');
+
+function logLine(msg,cls=''){
+  const span=document.createElement('span');
+  if(cls) span.className=cls;
+  span.textContent=msg+'\n';
+  convLog.appendChild(span);
+  convLog.scrollTop=convLog.scrollHeight;
+}
+
+convDrop.addEventListener('dragover',e=>{e.preventDefault();convDrop.classList.add('hover');});
+convDrop.addEventListener('dragleave',()=>convDrop.classList.remove('hover'));
+convDrop.addEventListener('drop',e=>{
+  e.preventDefault(); convDrop.classList.remove('hover');
+  addConvFiles([...e.dataTransfer.files]);
+});
+convInput.addEventListener('change',()=>addConvFiles([...convInput.files]));
+
+function addConvFiles(files){
+  const valid=files.filter(f=>/\.(dsn|pds)$/i.test(f.name));
+  const added=valid.filter(f=>!convFiles.some(x=>x.name===f.name));
+  convFiles.push(...added);
+  updateConvUI();
+  if(added.length) logLine(`파일 ${added.length}개 추가됨.`,'info');
+}
+
+function updateConvUI(){
+  convFname.textContent=convFiles.length?`선택된 파일: ${convFiles.map(f=>f.name).join(', ')}`:'';
+  convBtn.disabled=convFiles.length===0;
+}
+
+function clearConv(){ convFiles=[]; convInput.value=''; updateConvUI(); convLog.innerHTML=''; setStatus(convStatus,'',''); }
+
+function setStatus(el,msg,cls){ el.textContent=msg; el.className='status '+(cls||''); }
+
+async function runConvert(){
+  if(!convFiles.length) return;
+  const scale=parseFloat(document.getElementById('opt-scale').value)||1.0;
+  const nBez=Math.max(8,parseInt(document.getElementById('opt-bez').value)||32);
+  convBtn.disabled=true;
+  setStatus(convStatus,'변환 중...','info');
+  let ok=0, fail=0;
+  for(const file of convFiles){
+    const ext=file.name.split('.').pop().toLowerCase();
+    const outName=file.name.replace(/\.[^.]+$/,'.dxf');
+    try{
+      let dxfText;
+      if(ext==='pds'){
+        const buf=await file.arrayBuffer();
+        const text=new TextDecoder('iso-8859-1').decode(buf);
+        const parser=new PDSParser(); parser.load(text);
+        dxfText=writePDSDXF(parser);
+        logLine(`✓  ${file.name}  →  ${outName}  [PDS] 피스:${parser.cutPolys.length} 봉제선:${parser.sewPaths.length} 노치:${parser.notches.length}`,'ok');
+      } else {
+        const text=await readTextMultiEnc(file);
+        const {pieces,fmt}=parseDSN(text);
+        if(!pieces.length) throw new Error('패턴 피스를 찾지 못했습니다. 파일 형식을 확인하세요.');
+        dxfText=writeDSNDXF(pieces,scale,nBez);
+        const nPts=pieces.reduce((a,p)=>a+p.boundaryPoints(nBez).length,0);
+        logLine(`✓  ${file.name}  →  ${outName}  [${fmt}] 피스:${pieces.length} 점:${nPts}`,'ok');
+      }
+      downloadText(dxfText, outName);
+      ok++;
+    }catch(e){
+      logLine(`✗  ${file.name}  →  오류: ${e.message}`,'err');
+      fail++;
+    }
+  }
+  const msg=`완료  ·  성공 ${ok}개`+(fail?`  ·  실패 ${fail}개`:'');
+  logLine('\n'+msg,'info');
+  setStatus(convStatus,msg,fail?'err':'ok');
+  convBtn.disabled=false;
+}
+
+// ══════════════════════════════════════════════════════════════
+//  DXF 파서 (뷰어용)
+// ══════════════════════════════════════════════════════════════
+function aciToHex(aci){
+  const MAP={0:'#333333',1:'#CC2222',2:'#B8860B',3:'#228822',4:'#1188AA',5:'#2255CC',6:'#AA22AA',7:'#333333',8:'#666666',9:'#888888',256:'#444444'};
+  if(MAP[aci]) return MAP[aci];
+  if(aci>=10&&aci<=249){
+    const t=(aci-10)/239;
+    return `#${Math.round(80+175*t).toString(16).padStart(2,'0')}${Math.round(180-60*t).toString(16).padStart(2,'0')}${Math.round(220-40*t).toString(16).padStart(2,'0')}`;
+  }
+  return '#CCCCCC';
+}
+
+function parseDXFFile(text){
+  const lines=text.split(/\r?\n/);
+  const pairs=[];
+  for(let i=0;i<lines.length;){
+    const a=lines[i]?lines[i].trim():''; i++;
+    const b=lines[i]!==undefined?lines[i].trim():''; i++;
+    if(a===''&&b==='') continue;
+    pairs.push([parseInt(a)||0, b]);
+  }
+
+  const layerColors={}; // name→hex
+  const entities=[];
+  let pi=0; let section=null;
+
+  while(pi<pairs.length){
+    const [code,val]=pairs[pi];
+
+    if(code===0&&val==='SECTION'){ pi++; section=pairs[pi]?pairs[pi][1]:null; pi++; continue; }
+    if(code===0&&val==='ENDSEC'){ section=null; pi++; continue; }
+    if(code===0&&val==='EOF') break;
+
+    // TABLES → LAYER 색상
+    if(section==='TABLES'&&code===0&&val==='LAYER'){
+      pi++;
+      let lname='0', lcolor=7;
+      while(pi<pairs.length&&pairs[pi][0]!==0){
+        const [c,v]=pairs[pi];
+        if(c===2) lname=v;
+        if(c===62) lcolor=Math.abs(parseInt(v))||7;
+        pi++;
+      }
+      layerColors[lname]=aciToHex(lcolor);
+      continue;
+    }
+
+    // ENTITIES
+    if(section==='ENTITIES'&&code===0){
+      const type=val;
+      if(['LINE','LWPOLYLINE','POLYLINE','ARC','CIRCLE','TEXT','MTEXT','INSERT'].includes(type)){
+        pi++;
+        const e={type,layer:'0',color:null};
+        let lastX=null;
+        const verts=[];
+
+        while(pi<pairs.length&&pairs[pi][0]!==0){
+          const [c,v]=pairs[pi]; pi++;
+          if(c===8) e.layer=v;
+          if(c===62) e.aciColor=Math.abs(parseInt(v));
+
+          if(type==='LINE'){
+            if(c===10) e.x1=parseFloat(v);
+            else if(c===20) e.y1=parseFloat(v);
+            else if(c===11) e.x2=parseFloat(v);
+            else if(c===21) e.y2=parseFloat(v);
+          }
+          if(type==='LWPOLYLINE'){
+            if(c===70) e.closed=(parseInt(v)&1)===1;
+            if(c===10) lastX=parseFloat(v);
+            else if(c===20&&lastX!==null){ verts.push([lastX,parseFloat(v)]); lastX=null; }
+          }
+          if(type==='POLYLINE'){
+            if(c===70) e.closed=(parseInt(v)&1)===1;
+          }
+          if(type==='ARC'||type==='CIRCLE'){
+            if(c===10) e.cx=parseFloat(v);
+            else if(c===20) e.cy=parseFloat(v);
+            else if(c===40) e.r=parseFloat(v);
+            if(type==='ARC'){
+              if(c===50) e.a1=parseFloat(v);
+              else if(c===51) e.a2=parseFloat(v);
+            }
+          }
+          if(type==='TEXT'||type==='MTEXT'){
+            if(c===10) e.tx=parseFloat(v);
+            else if(c===20) e.ty=parseFloat(v);
+            else if(c===40) e.th=parseFloat(v);
+            else if(c===1) e.text=v;
+          }
+        }
+
+        if(type==='LWPOLYLINE') e.points=verts;
+        if(type==='POLYLINE'){
+          // VERTEX entities follow — collect them
+          e.points=[]; e.verts=true;
+        }
+        entities.push(e);
+        continue;
+      }
+
+      // VERTEX (for POLYLINE)
+      if(val==='VERTEX'){
+        pi++;
+        let vx=null,vy=null;
+        while(pi<pairs.length&&pairs[pi][0]!==0){
+          const [c,v]=pairs[pi]; pi++;
+          if(c===10) vx=parseFloat(v);
+          else if(c===20) vy=parseFloat(v);
+        }
+        // attach to last POLYLINE
+        const last=entities[entities.length-1];
+        if(last&&last.type==='POLYLINE'&&vx!==null&&vy!==null) last.points.push([vx,vy]);
+        continue;
+      }
+    }
+
+    pi++;
+  }
+
+  // resolve entity colors
+  for(const e of entities){
+    if(e.aciColor&&e.aciColor!==256) e.color=aciToHex(e.aciColor);
+    else e.color=layerColors[e.layer]||'#CCCCCC';
+  }
+
+  // compute bbox
+  let xs=[],ys=[];
+  for(const e of entities){
+    if(e.type==='LINE'){ xs.push(e.x1??0,e.x2??0); ys.push(e.y1??0,e.y2??0); }
+    else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){ xs.push(...e.points.map(p=>p[0])); ys.push(...e.points.map(p=>p[1])); }
+    else if(e.type==='ARC'||e.type==='CIRCLE'){ const r=e.r||0; xs.push((e.cx||0)-r,(e.cx||0)+r); ys.push((e.cy||0)-r,(e.cy||0)+r); }
+    else if(e.type==='TEXT'||e.type==='MTEXT'){ xs.push(e.tx||0); ys.push(e.ty||0); }
+  }
+  let bbox=[-100,-100,100,100];
+  if(xs.length){ const pad=Math.max((Math.max(...xs)-Math.min(...xs))*0.05,1); bbox=[Math.min(...xs)-pad,Math.min(...ys)-pad,Math.max(...xs)+pad,Math.max(...ys)+pad]; }
+
+  const layers={};
+  for(const e of entities) layers[e.layer]=true;
+
+  return {entities,layerColors,bbox,layers};
+}
+
+// ══════════════════════════════════════════════════════════════
+//  뷰어 상태
+// ══════════════════════════════════════════════════════════════
+let vp={ox:0,oy:0,scale:1};
+let dxfData=null;
+let layerState={};
+let dragStart=null;
+
+const canvas=document.getElementById('dxf-canvas');
+const ctx=canvas.getContext('2d');
+const layerPanel=document.getElementById('layer-panel');
+let layerPanelVisible=false;
+
+function resizeCanvas(){
+  const wrap=document.getElementById('viewer-wrap');
+  const panelW=layerPanelVisible?190:0;
+  canvas.width=wrap.clientWidth-panelW;
+  canvas.height=wrap.clientHeight;
+  if(dxfData) renderDXF();
+}
+
+function w2s(wx,wy){ return [wx*vp.scale+vp.ox, -wy*vp.scale+vp.oy]; }
+function s2w(sx,sy){ return [(sx-vp.ox)/vp.scale, -(sy-vp.oy)/vp.scale]; }
+
+function fitView(){
+  if(!dxfData) return;
+  const [x0,y0,x1,y1]=dxfData.bbox;
+  const W=canvas.width||800, H=canvas.height||600;
+  const w=x1-x0||1, h=y1-y0||1;
+  vp.scale=Math.min((W-80)/w,(H-80)/h);
+  const cx=(x0+x1)/2, cy=(y0+y1)/2;
+  vp.ox=W/2-cx*vp.scale;
+  vp.oy=H/2+cy*vp.scale;
+  renderDXF();
+  document.getElementById('coord-zoom').textContent=`배율: ${vp.scale.toFixed(2)}x`;
+}
+
+function zoomCenter(f){
+  const W=canvas.width/2, H=canvas.height/2;
+  const [wx,wy]=s2w(W,H);
+  vp.scale*=f;
+  vp.ox=W-wx*vp.scale;
+  vp.oy=H+wy*vp.scale;
+  renderDXF();
+  document.getElementById('coord-zoom').textContent=`배율: ${vp.scale.toFixed(2)}x`;
+}
+
+function drawArc(cx,cy,r,a1,a2){
+  const [scx,scy]=w2s(cx,cy);
+  const sr=r*vp.scale;
+  if(sr<0.5) return;
+  const sa=-a2*Math.PI/180, ea=-a1*Math.PI/180;
+  ctx.beginPath();
+  ctx.arc(scx,scy,sr,sa,ea,false);
+  ctx.stroke();
+}
+
+function renderDXF(){
+  if(!dxfData) return;
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  ctx.fillStyle='#FAFAFA';
+  ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  for(const e of dxfData.entities){
+    if(!layerState[e.layer]) continue;
+    ctx.strokeStyle=e.color||'#CCCCCC';
+    ctx.lineWidth=1;
+    try{
+      if(e.type==='LINE'){
+        const [sx1,sy1]=w2s(e.x1||0,e.y1||0);
+        const [sx2,sy2]=w2s(e.x2||0,e.y2||0);
+        ctx.beginPath(); ctx.moveTo(sx1,sy1); ctx.lineTo(sx2,sy2); ctx.stroke();
+      }
+      else if(e.type==='LWPOLYLINE'||e.type==='POLYLINE'){
+        const pts=e.points; if(!pts||pts.length<2) continue;
+        ctx.beginPath();
+        const [sx0,sy0]=w2s(pts[0][0],pts[0][1]); ctx.moveTo(sx0,sy0);
+        for(let i=1;i<pts.length;i++){ const [sx,sy]=w2s(pts[i][0],pts[i][1]); ctx.lineTo(sx,sy); }
+        if(e.closed){ const [sx,sy]=w2s(pts[0][0],pts[0][1]); ctx.lineTo(sx,sy); }
+        ctx.stroke();
+      }
+      else if(e.type==='CIRCLE'){ drawArc(e.cx||0,e.cy||0,e.r||0,0,360); }
+      else if(e.type==='ARC'){ drawArc(e.cx||0,e.cy||0,e.r||0,e.a1||0,e.a2||360); }
+      else if(e.type==='TEXT'||e.type==='MTEXT'){
+        if(!e.text) continue;
+        const [sx,sy]=w2s(e.tx||0,e.ty||0);
+        const fs=Math.max(6,Math.min(18,Math.round((e.th||2.5)*vp.scale*0.8)));
+        ctx.fillStyle=e.color||'#CCCCCC';
+        ctx.font=`${fs}px Segoe UI`;
+        ctx.fillText(e.text.slice(0,80),sx,sy);
+      }
+    }catch(ex){}
+  }
+}
+
+// 마우스 이벤트
+canvas.addEventListener('mousedown',e=>{ if(e.button===0||e.button===1||e.button===2) dragStart={x:e.clientX,y:e.clientY,ox:vp.ox,oy:vp.oy}; });
+canvas.addEventListener('mousemove',e=>{
+  if(dragStart){ vp.ox=dragStart.ox+(e.clientX-dragStart.x); vp.oy=dragStart.oy+(e.clientY-dragStart.y); renderDXF(); document.getElementById('coord-zoom').textContent=`배율: ${vp.scale.toFixed(2)}x`; }
+  const rect=canvas.getBoundingClientRect();
+  const [wx,wy]=s2w(e.clientX-rect.left,e.clientY-rect.top);
+  document.getElementById('coord-xy').textContent=`X: ${wx.toFixed(3)}  Y: ${wy.toFixed(3)}`;
+});
+canvas.addEventListener('mouseup',()=>dragStart=null);
+canvas.addEventListener('mouseleave',()=>dragStart=null);
+canvas.addEventListener('contextmenu',e=>e.preventDefault());
+canvas.addEventListener('wheel',e=>{
+  e.preventDefault();
+  const rect=canvas.getBoundingClientRect();
+  const px=e.clientX-rect.left, py=e.clientY-rect.top;
+  const [wx,wy]=s2w(px,py);
+  const f=e.deltaY<0?1.15:1/1.15;
+  vp.scale*=f; vp.ox=px-wx*vp.scale; vp.oy=py+wy*vp.scale;
+  renderDXF();
+  document.getElementById('coord-zoom').textContent=`배율: ${vp.scale.toFixed(2)}x`;
+},{passive:false});
+
+document.addEventListener('keydown',e=>{ if(e.key==='f'||e.key==='F') fitView(); });
+
+// 뷰어 파일 열기
+function viewerOpen(){ document.getElementById('view-input').click(); }
+
+async function loadDXFFile(file){
+  if(!file) return;
+  try{
+    const text=await readTextMultiEnc(file);
+    dxfData=parseDXFFile(text);
+    layerState={};
+    for(const k of Object.keys(dxfData.layers)) layerState[k]=true;
+    document.getElementById('view-title').textContent=file.name;
+    document.getElementById('coord-info').textContent=`엔티티 ${dxfData.entities.length.toLocaleString()}개  |  레이어 ${Object.keys(layerState).length}개`;
+    buildLayerPanel();
+    resizeCanvas();
+    fitView();
+  }catch(e){ alert('DXF 파일을 열 수 없습니다:\n'+e.message); }
+}
+
+// 드래그&드롭 (뷰어)
+canvas.addEventListener('dragover',e=>{e.preventDefault();});
+canvas.addEventListener('drop',e=>{
+  e.preventDefault();
+  const f=[...e.dataTransfer.files].find(f=>/\.dxf$/i.test(f.name));
+  if(f) loadDXFFile(f);
+});
+
+// 레이어 패널
+function toggleLayerPanel(){
+  layerPanelVisible=!layerPanelVisible;
+  layerPanel.classList.toggle('hidden',!layerPanelVisible);
+  document.getElementById('layer-toggle-btn').classList.toggle('active',layerPanelVisible);
+  setTimeout(resizeCanvas,10);
+}
+
+function buildLayerPanel(){
+  layerPanel.innerHTML='';
+  const hdr=document.createElement('div');
+  hdr.style.cssText='font-size:.78rem;font-weight:700;color:#3C3C43;padding:6px 4px 8px;border-bottom:1px solid #D1D1D6;margin-bottom:4px';
+  hdr.textContent='레이어';
+  const btnRow=document.createElement('div');
+  btnRow.style.cssText='display:flex;gap:4px;margin-bottom:6px';
+  const allOn=document.createElement('button');
+  allOn.textContent='전체 켜기'; allOn.style.cssText='flex:1;padding:3px;background:#E5E5EA;color:#3C3C43;border:none;border-radius:4px;font-size:.72rem;cursor:pointer';
+  allOn.onclick=()=>{ Object.keys(layerState).forEach(k=>layerState[k]=true); buildLayerPanel(); renderDXF(); };
+  const allOff=document.createElement('button');
+  allOff.textContent='전체 끄기'; allOff.style.cssText='flex:1;padding:3px;background:#E5E5EA;color:#3C3C43;border:none;border-radius:4px;font-size:.72rem;cursor:pointer';
+  allOff.onclick=()=>{ Object.keys(layerState).forEach(k=>layerState[k]=false); buildLayerPanel(); renderDXF(); };
+  btnRow.append(allOn,allOff);
+  layerPanel.append(hdr,btnRow);
+
+  for(const name of Object.keys(layerState).sort()){
+    const item=document.createElement('label');
+    item.className='layer-item';
+    const cb=document.createElement('input'); cb.type='checkbox'; cb.checked=layerState[name];
+    cb.onchange=()=>{ layerState[name]=cb.checked; renderDXF(); };
+    const lbl=document.createElement('span');
+    lbl.textContent=name.length>20?name.slice(0,19)+'…':name;
+    item.append(cb,lbl);
+    layerPanel.appendChild(item);
+  }
+}
+
+// 창 크기 변경
+window.addEventListener('resize',resizeCanvas);
+
+// 초기 환영 화면
+function showWelcome(){
+  const W=canvas.width||800, H=canvas.height||400;
+  ctx.clearRect(0,0,W,H);
+  ctx.fillStyle='#FAFAFA'; ctx.fillRect(0,0,W,H);
+  ctx.fillStyle='#007AFF'; ctx.font='bold 22px Segoe UI'; ctx.textAlign='center';
+  ctx.fillText('DXF 뷰어',W/2,H/2-20);
+  ctx.fillStyle='#8E8E93'; ctx.font='11px Segoe UI';
+  ctx.fillText('DXF 파일을 열거나 여기에 드래그하세요',W/2,H/2+14);
+  ctx.fillStyle='#C7C7CC'; ctx.font='10px Segoe UI';
+  ctx.fillText('스크롤: 줌  |  드래그: 이동  |  F: 전체 보기',W/2,H/2+38);
+  ctx.textAlign='left';
+}
+
+// 초기화
+setTimeout(()=>{ resizeCanvas(); showWelcome(); },100);
+</script>
+</body>
+</html>
