@@ -328,13 +328,155 @@
       return { currentPrice, ath, athDate, pctFromAth, currency, companyName };
     }
 
+    // ── Utils ────────────────────────────────────────────────
+    function formatPrice(price, currency) {
+      const symbol = currency === 'KRW' ? '₩' : '$';
+      let formatted;
+      if (price >= 1000)       formatted = price.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+      else if (price >= 1)     formatted = price.toFixed(2);
+      else                     formatted = price.toFixed(4);
+      return `${symbol}${formatted}`;
+    }
+
+    // ── Card renderer ─────────────────────────────────────────
+    function renderCard(symbol, data, loading, errorMsg) {
+      const grid = document.getElementById('stockGrid');
+
+      // 빈 상태 제거
+      const empty = grid.querySelector('.empty-state');
+      if (empty) empty.remove();
+
+      let card = document.getElementById(`card-${symbol}`);
+      if (!card) {
+        card = document.createElement('div');
+        card.id = `card-${symbol}`;
+        grid.appendChild(card);
+      }
+
+      if (loading) {
+        card.className = 'stock-card loading';
+        card.innerHTML = `
+      <div class="card-header">
+        <div><div class="ticker">${symbol}</div><div class="company-name">불러오는 중...</div></div>
+        <button class="btn-delete" onclick="removeStock('${symbol}')">✕</button>
+      </div>
+      <div class="spinner-wrap"><div class="spinner"></div></div>`;
+        return;
+      }
+
+      if (errorMsg) {
+        card.className = 'stock-card error';
+        card.innerHTML = `
+      <div class="card-header">
+        <div><div class="ticker">${symbol}</div></div>
+        <button class="btn-delete" onclick="removeStock('${symbol}')">✕</button>
+      </div>
+      <div class="error-msg">⚠️ ${errorMsg}</div>`;
+        return;
+      }
+
+      const { currentPrice, ath, athDate, pctFromAth, currency, companyName } = data;
+      const negative   = pctFromAth < 0;
+      const pctText    = `${pctFromAth >= 0 ? '+' : ''}${pctFromAth.toFixed(2)}%`;
+      const progressW  = Math.min(100, Math.max(2, (currentPrice / ath) * 100)).toFixed(1);
+
+      card.className = 'stock-card';
+      card.innerHTML = `
+    <div class="card-header">
+      <div>
+        <div class="ticker">${symbol}</div>
+        <div class="company-name" title="${companyName}">${companyName}</div>
+      </div>
+      <button class="btn-delete" onclick="removeStock('${symbol}')">✕</button>
+    </div>
+    <div class="price-row">
+      <div class="current-price">${formatPrice(currentPrice, currency)}</div>
+      <div class="pct-badge ${negative ? 'negative' : 'positive'}">${pctText}</div>
+    </div>
+    <div class="ath-row">
+      <span>역대 최고가 <span class="ath-value">${formatPrice(ath, currency)}</span></span>
+      <span>${athDate}</span>
+    </div>
+    <div class="progress-track">
+      <div class="progress-bar ${negative ? 'negative' : 'positive'}" style="width:${progressW}%"></div>
+    </div>`;
+    }
+
     // ── Enter key ───────────────────────────────────────────
     document.getElementById('tickerInput')
       .addEventListener('keydown', e => { if (e.key === 'Enter') addStock(); });
 
-    // placeholder — Task 3, 4에서 구현
-    function addStock() {}
-    function refreshAll() {}
+    // ── Actions ───────────────────────────────────────────────
+    async function addStock() {
+      const input  = document.getElementById('tickerInput');
+      const addBtn = document.getElementById('addBtn');
+      const symbol = input.value.trim().toUpperCase();
+      if (!symbol) return;
+      if (watchlist.includes(symbol)) {
+        showToast(`${symbol}은(는) 이미 추가되어 있습니다`, 'error');
+        return;
+      }
+
+      input.value = '';
+      addBtn.disabled = true;
+      watchlist.push(symbol);
+      saveWatchlist();
+      updateControls();
+      renderCard(symbol, null, true);
+
+      try {
+        const data = await fetchStockData(symbol);
+        stockCache[symbol] = data;
+        renderCard(symbol, data, false);
+        showToast(`${symbol} 추가 완료`, 'success');
+      } catch (e) {
+        renderCard(symbol, null, false, e.message);
+      } finally {
+        addBtn.disabled = false;
+      }
+    }
+
+    function removeStock(symbol) {
+      watchlist = watchlist.filter(s => s !== symbol);
+      delete stockCache[symbol];
+      saveWatchlist();
+      updateControls();
+      document.getElementById(`card-${symbol}`)?.remove();
+      renderEmpty();
+    }
+
+    async function refreshAll() {
+      if (watchlist.length === 0) return;
+      const btn = document.getElementById('refreshBtn');
+      btn.classList.add('spinning');
+      btn.disabled = true;
+
+      await Promise.all(watchlist.map(async symbol => {
+        renderCard(symbol, stockCache[symbol] ?? null, true);
+        try {
+          const data = await fetchStockData(symbol);
+          stockCache[symbol] = data;
+          renderCard(symbol, data, false);
+        } catch (e) {
+          renderCard(symbol, null, false, e.message);
+        }
+      }));
+
+      btn.classList.remove('spinning');
+      btn.disabled = false;
+      document.getElementById('lastUpdated').textContent =
+        `마지막 업데이트: ${new Date().toLocaleTimeString('ko-KR')}`;
+    }
+
+    // ── Init ──────────────────────────────────────────────────
+    (async function init() {
+      updateControls();
+      if (watchlist.length === 0) { renderEmpty(); return; }
+      await refreshAll();
+    })();
+
+    // 5분마다 자동 새로고침
+    setInterval(refreshAll, 5 * 60 * 1000);
   </script>
 </body>
 </html>
