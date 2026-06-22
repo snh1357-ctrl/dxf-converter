@@ -3,7 +3,11 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>DXF 도구</title>
+<meta name="description" content="DXF 변환기 및 뷰어 — DSN·PDS 패턴 파일을 DXF로 변환하고 브라우저에서 바로 열어 확인하세요. 설치 없이 무료로 사용 가능합니다.">
+<meta name="keywords" content="DXF 변환기, DXF 뷰어, DSN 변환, PDS 변환, CAD, 패턴 파일">
+<title>DXF 도구 — 변환기 &amp; 뷰어</title>
+<!-- Google AdSense — ca-pub-XXXXXXXXXXXXXXXX 을 본인 게시자 ID로 교체하세요 -->
+<script async src="https://pagead2.googlesyndication.com/pagead/js/adsbygoogle.js?client=ca-pub-XXXXXXXXXXXXXXXX" crossorigin="anonymous"></script>
 <style>
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-height:100vh}
@@ -51,6 +55,10 @@ body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-heig
 .tbtn.active{background:#007AFF;color:#fff}
 .vdivider{width:1px;height:20px;background:#D1D1D6;margin:0 4px}
 #coord-bar{font-size:.75rem;color:#8E8E93;padding:4px 14px;background:#F2F2F7;border-radius:0 0 14px 14px;border:1px solid #E0E0E0;border-top:none;font-family:Consolas,monospace;display:flex;gap:20px}
+/* ─── 광고 컨테이너 ─── */
+.ad-wrap{background:#fff;border-radius:14px;box-shadow:0 1px 6px rgba(0,0,0,.05);overflow:hidden;margin-bottom:16px;text-align:center;min-height:90px;display:flex;align-items:center;justify-content:center}
+.ad-top-wrap{max-width:900px;margin:12px auto 0;padding:0 20px}
+.ad-top-wrap .ad-wrap{min-height:90px}
 /* ─── 파일명 표시 ─── */
 .fname{font-size:.8rem;color:#555;margin-top:6px;min-height:1em}
 /* ─── 뱃지 ─── */
@@ -68,6 +76,19 @@ body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-heig
 <div class="tabs">
   <div class="tab active" onclick="showTab('conv')">🔄 DXF 변환기</div>
   <div class="tab" onclick="showTab('view')">👁️ DXF 뷰어</div>
+</div>
+
+<!-- 상단 배너 광고 (탭 전환 무관, 항상 노출) — data-ad-slot 을 AdSense 광고 슬롯 ID로 교체 -->
+<div class="ad-top-wrap">
+  <div class="ad-wrap">
+    <ins class="adsbygoogle"
+         style="display:block;width:100%"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+         data-ad-slot="1111111111"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
 </div>
 
 <!-- ══════════════ 변환기 탭 ══════════════ -->
@@ -105,6 +126,17 @@ body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-heig
     </div>
   </div>
 
+  <!-- 중간 광고 — 변환 버튼 클릭 후 로그 전에 노출, CTR 높은 위치 -->
+  <div class="ad-wrap">
+    <ins class="adsbygoogle"
+         style="display:block;width:100%"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+         data-ad-slot="2222222222"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+
   <div class="card">
     <div class="card-header">변환 로그</div>
     <div class="card-body" style="padding:0">
@@ -137,6 +169,17 @@ body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-heig
       <span id="coord-zoom">배율: —</span>
       <span id="coord-info"></span>
     </div>
+  </div>
+
+  <!-- 뷰어 하단 광고 — 파일 확인 후 자연스러운 노출 -->
+  <div class="ad-wrap" style="margin-top:16px">
+    <ins class="adsbygoogle"
+         style="display:block;width:100%"
+         data-ad-client="ca-pub-XXXXXXXXXXXXXXXX"
+         data-ad-slot="3333333333"
+         data-ad-format="auto"
+         data-full-width-responsive="true"></ins>
+    <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
   </div>
 </div>
 
