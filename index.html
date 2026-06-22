@@ -69,6 +69,13 @@ body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-heig
 .opt-row label{display:flex;align-items:center;gap:6px;white-space:nowrap}
 .opt-row input[type=number]{width:70px;padding:4px 8px;border:1px solid #D1D1D6;border-radius:7px;font-size:.85rem;background:#F2F2F7}
 .sep{width:1px;height:18px;background:#D1D1D6}
+/* ─── 방문자 카운터 ─── */
+.visitor-bar{max-width:900px;margin:20px auto 0;padding:0 20px 24px;display:flex;justify-content:flex-end;gap:20px;font-size:.8rem;color:#8E8E93}
+.visitor-bar .vc-item{display:flex;align-items:center;gap:6px;background:#fff;border:1px solid #E5E5EA;border-radius:20px;padding:5px 14px}
+.visitor-bar .vc-label{color:#AEAEB2}
+.visitor-bar .vc-num{font-weight:700;color:#1C1C1E;font-size:.9rem;min-width:2ch;text-align:right}
+.visitor-bar .vc-dot{width:7px;height:7px;border-radius:50%;background:#34C759;flex-shrink:0}
+.visitor-bar .vc-dot.total{background:#007AFF}
 </style>
 </head>
 <body>
@@ -180,6 +187,20 @@ body{font-family:'Segoe UI',sans-serif;background:#F2F2F7;color:#1C1C1E;min-heig
          data-ad-format="auto"
          data-full-width-responsive="true"></ins>
     <script>(adsbygoogle = window.adsbygoogle || []).push({});</script>
+  </div>
+</div>
+
+<!-- 방문자 카운터 -->
+<div class="visitor-bar">
+  <div class="vc-item">
+    <span class="vc-dot"></span>
+    <span class="vc-label">오늘 방문자</span>
+    <span class="vc-num" id="cnt-today">…</span>
+  </div>
+  <div class="vc-item">
+    <span class="vc-dot total"></span>
+    <span class="vc-label">누적 방문자</span>
+    <span class="vc-num" id="cnt-total">…</span>
   </div>
 </div>
 
@@ -948,6 +969,32 @@ function showWelcome(){
 
 // 초기화
 setTimeout(()=>{ resizeCanvas(); showWelcome(); },100);
+
+// ══════════════════════════════════════════════════════════════
+//  방문자 카운터 (CountAPI — 새로고침 중복 제외)
+// ══════════════════════════════════════════════════════════════
+(async function initVisitorCount(){
+  const NS  = 'dxf-converter-snh1357';
+  const today = new Date().toLocaleDateString('sv-SE'); // YYYY-MM-DD
+  const isNew = !sessionStorage.getItem('_visited');
+  if(isNew) sessionStorage.setItem('_visited','1');
+
+  const elT = document.getElementById('cnt-today');
+  const elA = document.getElementById('cnt-total');
+
+  try{
+    const act = isNew ? 'hit' : 'get';
+    const [rAll, rDay] = await Promise.all([
+      fetch(`https://api.countapi.xyz/${act}/${NS}/total`).then(r=>r.json()),
+      fetch(`https://api.countapi.xyz/${act}/${NS}/${today}`).then(r=>r.json()),
+    ]);
+    elT.textContent = (rDay.value||0).toLocaleString('ko-KR');
+    elA.textContent = (rAll.value||0).toLocaleString('ko-KR');
+  }catch{
+    elT.textContent = '—';
+    elA.textContent = '—';
+  }
+})();
 </script>
 </body>
 </html>
