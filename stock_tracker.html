@@ -289,18 +289,40 @@
     }
 
     // ── API ─────────────────────────────────────────────────
+    function fetchWithTimeout(url, ms) {
+      return new Promise((resolve, reject) => {
+        const timer = setTimeout(() => reject(new Error('timeout')), ms);
+        fetch(url)
+          .then(res => { clearTimeout(timer); resolve(res); })
+          .catch(err => { clearTimeout(timer); reject(err); });
+      });
+    }
+
     async function fetchYahoo(url) {
+      const proxies = [
+        `https://corsproxy.io/?url=${encodeURIComponent(url)}`,
+        `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`,
+        `https://api.codetabs.com/v1/proxy?quest=${encodeURIComponent(url)}`,
+      ];
+
       // 직접 호출 시도
       try {
-        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        const res = await fetchWithTimeout(url, 6000);
         if (res.ok) return await res.json();
-      } catch (_) { /* CORS or timeout → proxy */ }
+      } catch (_) {}
 
-      // CORS 프록시 폴백
-      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
-      const res = await fetch(proxy, { signal: AbortSignal.timeout(14000) });
-      if (!res.ok) throw new Error('데이터를 가져올 수 없습니다');
-      return res.json();
+      // 프록시 순차 시도
+      for (const proxy of proxies) {
+        try {
+          const res = await fetchWithTimeout(proxy, 12000);
+          if (res.ok) {
+            const text = await res.text();
+            return JSON.parse(text);
+          }
+        } catch (_) {}
+      }
+
+      throw new Error('데이터를 가져올 수 없습니다 (네트워크 오류)');
     }
 
     async function fetchStockData(symbol) {
