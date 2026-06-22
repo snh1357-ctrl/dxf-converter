@@ -1,0 +1,254 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>주가 ATH 트래커</title>
+  <style>
+    *, *::before, *::after { margin: 0; padding: 0; box-sizing: border-box; }
+
+    body {
+      background: #0f172a;
+      color: #e2e8f0;
+      font-family: 'Segoe UI', system-ui, -apple-system, sans-serif;
+      min-height: 100vh;
+      padding: 24px 16px;
+    }
+
+    header { text-align: center; margin-bottom: 32px; }
+
+    h1 {
+      font-size: 2rem;
+      font-weight: 700;
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      -webkit-background-clip: text;
+      -webkit-text-fill-color: transparent;
+      background-clip: text;
+      margin-bottom: 6px;
+    }
+
+    .subtitle { color: #64748b; font-size: 0.875rem; }
+
+    .add-section {
+      display: flex;
+      gap: 10px;
+      max-width: 480px;
+      margin: 0 auto 24px;
+    }
+
+    .add-section input {
+      flex: 1;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 10px;
+      padding: 11px 16px;
+      color: #e2e8f0;
+      font-size: 1rem;
+      text-transform: uppercase;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+    .add-section input::placeholder { text-transform: none; color: #475569; }
+    .add-section input:focus { border-color: #6366f1; }
+
+    .btn-add {
+      background: linear-gradient(135deg, #6366f1, #8b5cf6);
+      color: #fff;
+      border: none;
+      border-radius: 10px;
+      padding: 11px 22px;
+      font-size: 0.95rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s, transform 0.1s;
+      white-space: nowrap;
+    }
+    .btn-add:hover { opacity: 0.88; }
+    .btn-add:active { transform: scale(0.97); }
+    .btn-add:disabled { opacity: 0.45; cursor: not-allowed; }
+
+    .controls {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      max-width: 1100px;
+      margin: 0 auto 14px;
+    }
+
+    .stock-count { color: #64748b; font-size: 0.82rem; }
+
+    .btn-refresh {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 8px;
+      padding: 7px 14px;
+      color: #94a3b8;
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: background 0.2s, color 0.2s;
+    }
+    .btn-refresh:hover { background: #334155; color: #e2e8f0; }
+    .btn-refresh:disabled { opacity: 0.5; cursor: not-allowed; }
+    .btn-refresh .icon { display: inline-block; }
+    .btn-refresh.spinning .icon { animation: spin 0.9s linear infinite; }
+
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    .stock-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(300px, 1fr));
+      gap: 14px;
+      max-width: 1100px;
+      margin: 0 auto;
+    }
+
+    .stock-card {
+      background: #1e293b;
+      border: 1px solid #334155;
+      border-radius: 14px;
+      padding: 20px;
+      transition: border-color 0.2s, transform 0.2s, opacity 0.2s;
+    }
+    .stock-card:hover { border-color: #475569; transform: translateY(-2px); }
+    .stock-card.loading { opacity: 0.65; }
+    .stock-card.error { border-color: rgba(239,68,68,0.4); background: rgba(239,68,68,0.06); }
+
+    .card-header {
+      display: flex;
+      justify-content: space-between;
+      align-items: flex-start;
+      margin-bottom: 16px;
+    }
+
+    .ticker { font-size: 1.25rem; font-weight: 700; color: #f1f5f9; }
+
+    .company-name {
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-top: 3px;
+      max-width: 200px;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+
+    .btn-delete {
+      background: none;
+      border: none;
+      color: #475569;
+      cursor: pointer;
+      font-size: 1rem;
+      line-height: 1;
+      padding: 2px 4px;
+      transition: color 0.2s;
+    }
+    .btn-delete:hover { color: #ef4444; }
+
+    .price-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 14px;
+    }
+
+    .current-price { font-size: 1.55rem; font-weight: 700; color: #f1f5f9; }
+
+    .pct-badge {
+      font-size: 1rem;
+      font-weight: 700;
+      padding: 5px 11px;
+      border-radius: 8px;
+    }
+    .pct-badge.negative { background: rgba(239,68,68,0.14); color: #f87171; }
+    .pct-badge.positive { background: rgba(34,197,94,0.14); color: #4ade80; }
+
+    .ath-row {
+      display: flex;
+      justify-content: space-between;
+      font-size: 0.78rem;
+      color: #64748b;
+      margin-bottom: 10px;
+    }
+    .ath-value { color: #94a3b8; font-weight: 600; }
+
+    .progress-track {
+      background: #0f172a;
+      border-radius: 4px;
+      height: 5px;
+      overflow: hidden;
+    }
+    .progress-bar {
+      height: 100%;
+      border-radius: 4px;
+      transition: width 0.5s ease;
+    }
+    .progress-bar.negative { background: linear-gradient(90deg, #dc2626, #f87171); }
+    .progress-bar.positive { background: linear-gradient(90deg, #16a34a, #4ade80); }
+
+    .spinner-wrap { display: flex; justify-content: center; padding: 18px 0; }
+    .spinner {
+      width: 26px; height: 26px;
+      border: 3px solid #334155;
+      border-top-color: #6366f1;
+      border-radius: 50%;
+      animation: spin 0.8s linear infinite;
+    }
+
+    .error-msg { color: #f87171; font-size: 0.84rem; text-align: center; padding: 10px 0; }
+
+    .empty-state {
+      text-align: center;
+      padding: 52px 20px;
+      color: #475569;
+      grid-column: 1 / -1;
+    }
+    .empty-state .icon { font-size: 2.8rem; margin-bottom: 10px; }
+    .empty-state h3 { font-size: 1rem; color: #64748b; margin-bottom: 6px; }
+    .empty-state p { font-size: 0.82rem; }
+
+    .last-updated { text-align: center; color: #475569; font-size: 0.73rem; margin-top: 22px; }
+
+    .toast {
+      position: fixed; bottom: 22px; right: 22px;
+      background: #1e293b; border: 1px solid #334155;
+      border-radius: 10px; padding: 11px 18px; font-size: 0.88rem;
+      animation: slideIn 0.25s ease; z-index: 999;
+    }
+    .toast.error { border-color: rgba(239,68,68,0.5); color: #f87171; }
+    .toast.success { border-color: rgba(34,197,94,0.5); color: #4ade80; }
+
+    @keyframes slideIn {
+      from { transform: translateX(80px); opacity: 0; }
+      to   { transform: translateX(0);   opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>📈 주가 ATH 트래커</h1>
+    <p class="subtitle">역대 최고가(ATH) 대비 현재 주가 위치 확인</p>
+  </header>
+
+  <div class="add-section">
+    <input id="tickerInput" type="text" placeholder="종목 코드 입력 (예: AAPL, TSLA, NVDA)" maxlength="10">
+    <button class="btn-add" id="addBtn" onclick="addStock()">+ 추가</button>
+  </div>
+
+  <div class="controls">
+    <span class="stock-count" id="stockCount"></span>
+    <button class="btn-refresh" id="refreshBtn" onclick="refreshAll()">
+      <span class="icon">↻</span> 전체 새로고침
+    </button>
+  </div>
+
+  <div class="stock-grid" id="stockGrid"></div>
+  <p class="last-updated" id="lastUpdated"></p>
+
+  <script>
+    /* JS는 Task 2~4에서 추가 */
+  </script>
+</body>
+</html>
