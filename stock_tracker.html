@@ -249,7 +249,12 @@
 
   <script>
     // ── State ──────────────────────────────────────────────
-    let watchlist = JSON.parse(localStorage.getItem('ath_watchlist') || '[]');
+    let watchlist;
+    try {
+      watchlist = JSON.parse(localStorage.getItem('ath_watchlist') || '[]');
+    } catch (_) {
+      watchlist = [];
+    }
     const stockCache = {};  // symbol → { currentPrice, ath, athDate, pctFromAth, currency, companyName }
 
     // ── Persistence ────────────────────────────────────────
@@ -318,6 +323,7 @@
       if (ath === 0) throw new Error('가격 데이터가 없습니다');
 
       const currentPrice = meta.regularMarketPrice;
+      if (currentPrice == null) throw new Error('현재가 데이터를 가져올 수 없습니다');
       const currency     = meta.currency ?? 'USD';
       const companyName  = meta.longName ?? meta.shortName ?? symbol;
       const athDate      = athTimestamp
@@ -329,6 +335,14 @@
     }
 
     // ── Utils ────────────────────────────────────────────────
+    function escapeHtml(str) {
+      return String(str)
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;');
+    }
+
     function formatPrice(price, currency) {
       const symbol = currency === 'KRW' ? '₩' : '$';
       let formatted;
@@ -371,7 +385,7 @@
         <div><div class="ticker">${symbol}</div></div>
         <button class="btn-delete" onclick="removeStock('${symbol}')">✕</button>
       </div>
-      <div class="error-msg">⚠️ ${errorMsg}</div>`;
+      <div class="error-msg">⚠️ ${escapeHtml(errorMsg)}</div>`;
         return;
       }
 
@@ -385,7 +399,7 @@
     <div class="card-header">
       <div>
         <div class="ticker">${symbol}</div>
-        <div class="company-name" title="${companyName}">${companyName}</div>
+        <div class="company-name" title="${escapeHtml(companyName)}">${escapeHtml(companyName)}</div>
       </div>
       <button class="btn-delete" onclick="removeStock('${symbol}')">✕</button>
     </div>
@@ -408,10 +422,15 @@
 
     // ── Actions ───────────────────────────────────────────────
     async function addStock() {
+      if (document.getElementById('addBtn').disabled) return;
       const input  = document.getElementById('tickerInput');
       const addBtn = document.getElementById('addBtn');
       const symbol = input.value.trim().toUpperCase();
       if (!symbol) return;
+      if (!/^[A-Z]{1,5}(\.[A-Z]{1,2})?$/.test(symbol)) {
+        showToast('올바른 종목 코드를 입력하세요 (예: AAPL, BRK.B)', 'error');
+        return;
+      }
       if (watchlist.includes(symbol)) {
         showToast(`${symbol}은(는) 이미 추가되어 있습니다`, 'error');
         return;
@@ -446,6 +465,7 @@
     }
 
     async function refreshAll() {
+      if (document.hidden) return;
       if (watchlist.length === 0) return;
       const btn = document.getElementById('refreshBtn');
       btn.classList.add('spinning');
