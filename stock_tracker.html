@@ -283,6 +283,51 @@
         </div>`;
     }
 
+    // ── API ─────────────────────────────────────────────────
+    async function fetchYahoo(url) {
+      // 직접 호출 시도
+      try {
+        const res = await fetch(url, { signal: AbortSignal.timeout(8000) });
+        if (res.ok) return await res.json();
+      } catch (_) { /* CORS or timeout → proxy */ }
+
+      // CORS 프록시 폴백
+      const proxy = `https://api.allorigins.win/raw?url=${encodeURIComponent(url)}`;
+      const res = await fetch(proxy, { signal: AbortSignal.timeout(14000) });
+      if (!res.ok) throw new Error('데이터를 가져올 수 없습니다');
+      return res.json();
+    }
+
+    async function fetchStockData(symbol) {
+      const url = `https://query1.finance.yahoo.com/v8/finance/chart/${encodeURIComponent(symbol)}?interval=1mo&range=max`;
+      const data = await fetchYahoo(url);
+
+      const result = data?.chart?.result?.[0];
+      if (!result) throw new Error('종목을 찾을 수 없습니다');
+
+      const meta       = result.meta;
+      const highs      = result.indicators?.quote?.[0]?.high ?? [];
+      const timestamps = result.timestamp ?? [];
+
+      // ATH: 월봉 high 배열 전체에서 최댓값
+      let ath = 0, athTimestamp = 0;
+      highs.forEach((h, i) => {
+        if (h != null && h > ath) { ath = h; athTimestamp = timestamps[i]; }
+      });
+
+      if (ath === 0) throw new Error('가격 데이터가 없습니다');
+
+      const currentPrice = meta.regularMarketPrice;
+      const currency     = meta.currency ?? 'USD';
+      const companyName  = meta.longName ?? meta.shortName ?? symbol;
+      const athDate      = athTimestamp
+        ? new Date(athTimestamp * 1000).toLocaleDateString('ko-KR', { year: 'numeric', month: 'long', day: 'numeric' })
+        : '-';
+      const pctFromAth   = ((currentPrice - ath) / ath) * 100;
+
+      return { currentPrice, ath, athDate, pctFromAth, currency, companyName };
+    }
+
     // ── Enter key ───────────────────────────────────────────
     document.getElementById('tickerInput')
       .addEventListener('keydown', e => { if (e.key === 'Enter') addStock(); });
