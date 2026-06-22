@@ -248,7 +248,48 @@
   <p class="last-updated" id="lastUpdated"></p>
 
   <script>
-    /* JS는 Task 2~4에서 추가 */
+    // ── State ──────────────────────────────────────────────
+    let watchlist = JSON.parse(localStorage.getItem('ath_watchlist') || '[]');
+    const stockCache = {};  // symbol → { currentPrice, ath, athDate, pctFromAth, currency, companyName }
+
+    // ── Persistence ────────────────────────────────────────
+    function saveWatchlist() {
+      localStorage.setItem('ath_watchlist', JSON.stringify(watchlist));
+    }
+
+    function updateControls() {
+      document.getElementById('stockCount').textContent =
+        watchlist.length > 0 ? `총 ${watchlist.length}개 종목` : '';
+    }
+
+    // ── Toast ───────────────────────────────────────────────
+    function showToast(msg, type = 'success') {
+      const el = document.createElement('div');
+      el.className = `toast ${type}`;
+      el.textContent = msg;
+      document.body.appendChild(el);
+      setTimeout(() => el.remove(), 3000);
+    }
+
+    // ── Empty state ─────────────────────────────────────────
+    function renderEmpty() {
+      const grid = document.getElementById('stockGrid');
+      if (watchlist.length > 0 || grid.querySelector('.stock-card')) return;
+      grid.innerHTML = `
+        <div class="empty-state">
+          <div class="icon">📊</div>
+          <h3>아직 추가된 종목이 없습니다</h3>
+          <p>위에서 종목 코드를 입력해 추가해보세요 (예: AAPL, TSLA, NVDA, MSFT)</p>
+        </div>`;
+    }
+
+    // ── Enter key ───────────────────────────────────────────
+    document.getElementById('tickerInput')
+      .addEventListener('keydown', e => { if (e.key === 'Enter') addStock(); });
+
+    // placeholder — Task 3, 4에서 구현
+    function addStock() {}
+    function refreshAll() {}
   </script>
 </body>
 </html>
